@@ -12,9 +12,14 @@ using namespace std;
 int main(){
     Mesh queen("queen", "off");
     queen.printNeighbours(0);
-    vector<float> laplacians = computeLaplacianMesh(queen);
-    queen.exportToOFF("queen_with_laplacian", laplacians);
-    int wait;
-    cin >> wait;
+    vector<Vertice> laplacians = computeLaplacianMesh(queen);
+    vector<float> laplaciansX = extractDimension(laplacians, "x");
+    vector<float> laplaciansY = extractDimension(laplacians, "y");
+    vector<float> laplaciansZ = extractDimension(laplacians, "z");
+    vector<float> laplaciansNorms = extractDimension(laplacians, "norm");
+    queen.exportToOFF("queen_with_laplacian_norms", laplaciansNorms);
+    queen.exportToOFF("queen_with_laplacian_X", laplaciansX);
+    queen.exportToOFF("queen_with_laplacian_Y", laplaciansY);
+    queen.exportToOFF("queen_with_laplacian_Z", laplaciansZ);
     return 0;
 };

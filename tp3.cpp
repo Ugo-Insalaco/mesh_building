@@ -17,7 +17,7 @@ int main(){
     triangle.verticeList.push_back(v);
     int index = triangle.verticeList.size() -1;
     triangle.triangleSplit(0, index);
-    triangle.exportToOFF("tetrahedre_with_split");
+    triangle.exportToOFF("tetrahedre_with_split", true);
     triangle.printNeighbours(0);
 
     //==== Ajout d'un point par triangleSplit en dehors d'une face ====
@@ -27,13 +27,13 @@ int main(){
     triangle2.verticeList.push_back(w);
     int index2 = triangle2.verticeList.size() -1;
     triangle2.outsideSplit(0, index2);
-    triangle2.exportToOFF("tetrahedre_with_split_outside");
+    triangle2.exportToOFF("tetrahedre_with_split_outside", true);
     triangle2.printNeighbours(0);
 
     //==== Changement d'une face par edgeFlip ====
     Mesh doubleTetrahedre("double_tetrahedre", "off");
     doubleTetrahedre.edgeFlip(0, 1);
-    doubleTetrahedre.exportToOFF("double_tetrahedre_with_flip");
+    doubleTetrahedre.exportToOFF("double_tetrahedre_with_flip", true);
     doubleTetrahedre.printNeighbours(1);
     doubleTetrahedre.print();
 

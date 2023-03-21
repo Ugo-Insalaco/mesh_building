@@ -19,17 +19,39 @@ float computeCot(Vertice v1, Vertice v2){
     return abs(c/s);
 }
 
-vector<float> computeLaplacianMesh(Mesh mesh){
-    vector<float> laplacianList;
+vector<Vertice> computeLaplacianMesh(Mesh mesh){
+    vector<Vertice> laplacianList;
     vector<Vertice> verticeList = mesh.verticeList;
     int verticeListSize = verticeList.size();
     for(int i = 0; i< verticeListSize; i++){
         cout << i << "/" << verticeListSize << endl;
         Vertice laplacian = mesh.computeLaplacian(i);
-        laplacianList.push_back(laplacian.normalize());
+        laplacianList.push_back(laplacian);
     }
     return laplacianList;
 }
+
+vector<float> extractDimension(vector<Vertice> verticeList, string dimension){
+    vector<float> values;
+    int verticeListSize = verticeList.size();
+    for(int i = 0; i< verticeListSize; i++){
+        Vertice v = verticeList.at(i);
+        if(dimension == "x"){
+            values.push_back(v.x);
+        }
+        if(dimension == "y"){
+            values.push_back(v.y);
+        }
+        if(dimension == "z"){
+            values.push_back(v.z);
+        }
+        if(dimension == "norm"){
+            values.push_back(v.normalize());
+        }
+    }
+    return values;
+}
+
 
 Mesh getTetrahedre(){
     vector<Vertice> verticeList;

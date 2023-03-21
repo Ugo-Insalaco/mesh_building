@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <algorithm>
 #include "../h/Mesh.h"
 #include "utils.cpp"
 
@@ -140,20 +141,21 @@ void Mesh::exportToOFF(string shapeName, vector<float> values){
         cout << "invalid values, must be same size as verticeList" << endl;
         return;
     };
-    float max = 0;
-    float min = 10000;
-    for(float value: values){
-        if(value >= max){
-            max = value;
-        }
-        if(value <= min){
-            min = value;
-        }
-    };
+    float max_value = *std::max_element(values.begin(), values.end());
+    float min_value = *std::min_element(values.begin(), values.end());;
+
+    float max_allowed = 100;
+    float min_allowed = -100;
     vector<float>::iterator it;
     int i=0;
     for(it = values.begin(); it != values.end(); it++,i++ ){
-        values[i] = (values[i] - min)/(max - min);
+        if(values[i] >=max_allowed){
+            values[i] = max_allowed;
+        }
+        if(values[i] <=min_allowed){
+            values[i] = min_allowed;
+        }
+        values[i] = (int)((values[i] - max(min_allowed, min_value))/(min(max_allowed, max_value) - max(min_allowed, min_value)) * 255);
     };
 
     myfile.open ("off/"+shapeName+".off");
@@ -165,7 +167,7 @@ void Mesh::exportToOFF(string shapeName, vector<float> values){
         int * p = face.verticeIndexes;
         float value = values.at((*p));
 
-        myfile << "3 " << *p << " " << *(p+1) << " " << *(p+2) << " "<< (value) << " " << 1-value << " " << 0 <<"\n";
+        myfile << "3 " << *p << " " << *(p+1) << " " << *(p+2) << " "<< (value) << " " << 0 << " " << 0 <<"\n";
     }
     myfile.close();
 };
@@ -252,7 +254,7 @@ Vertice Mesh::computeLaplacian(int verticeIndex){
         Face nextFace = faceList.at(nextFaceIndex);
         float area = faceArea(nextFace);
 
-        areaSum += area;
+        areaSum += area/3;
         int verticePosition = nextFace.getVerticePosition(verticeIndex);
         Vertice v0 = verticeList.at(nextFace.verticeIndexes[verticePosition]);
         Vertice v1 = verticeList.at(nextFace.verticeIndexes[(verticePosition+1)%3]);
@@ -267,12 +269,12 @@ Vertice Mesh::computeLaplacian(int verticeIndex){
         v2 = verticeList.at(nextNextFace.verticeIndexes[(nextVerticePosition+2)%3]);
         float cot2 = computeCot(v0-v2, v1-v2);
 
-        laplacianSumX += (cot1 + cot2)*(v0.x - v1.x);
-        laplacianSumY += (cot1 + cot2)*(v0.y - v1.y);
-        laplacianSumZ += (cot1 + cot2)*(v0.z - v1.z);
+        laplacianSumX += (cot1 + cot2)*(v1.x - v0.x);
+        laplacianSumY += (cot1 + cot2)*(v1.y - v0.y);
+        laplacianSumZ += (cot1 + cot2)*(v1.z - v1.z);
 
     } while (nextFaceIndex != firstFaceIndex);
-    return Vertice(laplacianSumX/(areaSum*3), laplacianSumY/(areaSum*3), laplacianSumZ/(areaSum*3));
+    return Vertice(laplacianSumX/(areaSum*2), laplacianSumY/(areaSum*2), laplacianSumZ/(areaSum*2));
 }
 
 void Mesh::triangleSplit(int faceIndex, int verticeIndex){
@@ -322,7 +324,7 @@ void Mesh::outsideSplit(int faceIndex, int verticeIndex){
     Face face = faceList.at(faceIndex);
     Vertice vertice = verticeList.at(verticeIndex);
 
-    // S'il y a déjà une face avec le sommet alors il faut la supprimer
+    // S'il y a déjà une face avec le sommet alors il faut la flipper
     bool createfp0 = faceList.at(face.faceIndexes[0]).getVerticePosition(verticeIndex) < 0;
     bool createfp1 = faceList.at(face.faceIndexes[1]).getVerticePosition(verticeIndex) < 0;
     bool createfp2 = faceList.at(face.faceIndexes[2]).getVerticePosition(verticeIndex) < 0;
@@ -392,9 +394,10 @@ void Mesh::edgeFlip(int faceIndex1, int faceIndex2){
     if(edgeIndex1 == -1 || edgeIndex2 == -1){
         return;
     }
+
+    // On créé les nouvelles faces avec les bons indices de sommets
     Face newFace1, newFace2;
     if(!invert){
-        // On créé les nouvelles faces avec les bons indices de sommets
         newFace1.updateVertices(face1.verticeIndexes[(edgeIndex1+1)%3], face1.verticeIndexes[(edgeIndex1+2)%3], face2.verticeIndexes[(edgeIndex2+1)%3]);
         newFace2.updateVertices(face2.verticeIndexes[(edgeIndex2+1)%3], face1.verticeIndexes[(edgeIndex1+2)%3], face1.verticeIndexes[(edgeIndex1)]);
     }
@@ -447,7 +450,7 @@ void Mesh::edgeFlip(int faceIndex1, int faceIndex2){
     faceList[faceIndex2] = newFace2;
 } 
 
-int Mesh::visibilityFind(int startIndex, Vertice vertice, bool verbose = false){
+int Mesh::visibilityFind(int startIndex, Vertice vertice){
     // On choisit une face au hasard
     // Si la face contient le point c'est bon
     // On cherche l'arrête qui donne sur le nouveau point par un test d'orientation (on en choisit une au
@@ -462,9 +465,6 @@ int Mesh::visibilityFind(int startIndex, Vertice vertice, bool verbose = false){
     // int current_face_index = rand() % (faceList.size()-1) + 1;
     int current_face_index = startIndex;
     Face current_face = faceList.at(current_face_index);
-    if(verbose){
-        cout << current_face_index <<  endl;
-    }
     // Si la face contient le point à l'infini on se ramène sur une face de base
     if(current_face.isInfinite()){
         int infinite_position = current_face.getVerticePosition(0);
@@ -473,14 +473,14 @@ int Mesh::visibilityFind(int startIndex, Vertice vertice, bool verbose = false){
     bool found = false;
     int iter = 0;
     while(!found && iter < 10000){
-        if(verbose){
-            cout << current_face_index <<  endl;
-        }
         iter++;
         current_face = faceList.at(current_face_index);
-        if(current_face.isInfinite()){ // Si on revient sur une face infinie c'est qu'on est sorti
+        // Si on revient sur une face infinie c'est qu'on est sorti
+        if(current_face.isInfinite()){
             break;
         }
+
+        // On calcule l'orientation du nouveau point par rapport aux trois arrêtes du triangle
         Vertice v0 = verticeList[current_face.verticeIndexes[0]];
         Vertice v1 = verticeList[current_face.verticeIndexes[1]];
         Vertice v2 = verticeList[current_face.verticeIndexes[2]];
@@ -489,10 +489,12 @@ int Mesh::visibilityFind(int startIndex, Vertice vertice, bool verbose = false){
         double pred1 = orientationTest(v2, v0, vertice);
         double pred2 = orientationTest(v0, v1, vertice);
         
-        // cout << pred0 << " " << pred1 << " " << pred2 << endl;
+        // Si toutes les orientations sont bonnes on est à l'intérieur
         if(pred0 < 0 && pred1 < 0 && pred2 < 0){
             found = true;
         }
+
+        // Sinon on cherche par quelle face sortir pour se diriger vers le bon triangle
         else if(pred0 > 0){
             current_face_index = current_face.faceIndexes[0];
         }
@@ -509,31 +511,46 @@ int Mesh::visibilityFind(int startIndex, Vertice vertice, bool verbose = false){
 
 void Mesh::propagateSplit(int verticeIndex){
     vector<int> facesToTest;
+
+    // On commence par regarder tous les voisins
     getNeighboursList(verticeIndex, facesToTest);
     int i = 0;
+
     while(!facesToTest.empty() && i < 1000){
         int faceIndex = facesToTest.back();
         Face face = faceList.at(faceIndex);
+
+        // Si la face actuelle est infinie on ne veut pas la flipper
         if(face.isInfinite()){
             facesToTest.pop_back();
             continue;
         }
+
+        // On récupère la face opposée 
         int verticePosition = face.getVerticePosition(verticeIndex);
         int oppositeFaceIndex = face.faceIndexes[verticePosition];
         Face oppositeFace = faceList.at(oppositeFaceIndex);
         int oppositeFacePosition = oppositeFace.getFacePosition(faceIndex);
+        
+        // Si la face opposée est infinie on ne veut pas la flipper non plus
         if(oppositeFace.isInfinite()){
             facesToTest.pop_back();
             continue;
         }
+
+        // On test si le triangle est Delaunay par rapport à la face opposée
         Vertice v1 = verticeList.at(oppositeFace.verticeIndexes[oppositeFacePosition]);
         Vertice v2 = verticeList.at(face.verticeIndexes[(verticePosition)]);
         Vertice v3 = verticeList.at(face.verticeIndexes[(verticePosition+1)%3]);
         Vertice v4 = verticeList.at(face.verticeIndexes[(verticePosition+2)%3]);
+        
+        // Si c'est le cas alors on flip les faces et on les ajoute à notre pile
         if(isInCircle(v1, v2, v3, v4) >= 0){
             edgeFlip(faceIndex, oppositeFaceIndex);
             facesToTest.push_back(oppositeFaceIndex);
         }
+
+        // Sinon on passe à la suivante
         else{
             facesToTest.pop_back();
         }
@@ -586,6 +603,7 @@ void Mesh::importFromTxt(string fileName, bool delaunay){
     faceList.push_back(f2);
     faceList.push_back(f3);
 
+    // Pour chaque nouveau point
     for(int i=0; i<verticeListSize - 3; i++){
         float x, y, z;
         myfile >> x;
@@ -595,14 +613,15 @@ void Mesh::importFromTxt(string fileName, bool delaunay){
         int faceIndex = visibilityFind(0, vertice);
         verticeList.push_back(vertice);
         int verticeIndex = verticeList.size() - 1;
-        // Si on trouve une face dans le maillage on la split
+
+        // Si on trouve une face dans le maillage qui contient le point, on la split
         if(!faceList[faceIndex].isInfinite()){
             triangleSplit(faceIndex, verticeIndex);
             if(delaunay){
                 propagateSplit(verticeIndex);
             }
         }
-        // Sinon on tourne autours du sommet infini et on split toutes les faces que l'on voit
+        // Sinon on tourne autours du sommet infini et on split toutes les faces infinies que l'on voit
         else{
             vector<int> neighboursList;
             getNeighboursList(0, neighboursList);
@@ -613,6 +632,9 @@ void Mesh::importFromTxt(string fileName, bool delaunay){
             for(unsigned j = 0; j<neighboursList.size(); j++){
                 int nextFaceIndex = neighboursList[j];
                 Face nextFace = faceList.at(nextFaceIndex);
+
+                // On cherche quelle est la première face infinie que l'on peut split ou flip
+                // Afin de ne pas se retrouver coincé entre deux nouvelles faces infinies
                 if(nextFace.getVerticePosition(verticeIndex) >= 0){
                     continue;
                 }
@@ -634,6 +656,8 @@ void Mesh::importFromTxt(string fileName, bool delaunay){
             if(firstVisible && !lastVisible){
                 startIndex = 0;
             }
+
+            // Maintenant on parcourt toutes les faces infinies
             int neighboursListSize = neighboursList.size();
             for(unsigned j = 0; j<neighboursList.size(); j++){
                 int nextFaceIndex = neighboursList[(j+startIndex)%(neighboursListSize)];

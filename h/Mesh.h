@@ -31,7 +31,7 @@ class Mesh{
         void outsideSplit(int faceIndex, int verticeIndex);
         void edgeFlip(int faceIndex1, int faceIndex2);
         void propagateSplit(int verticeIndex);
-        int visibilityFind(int startIndex, Vertice vertice, bool verbose);
+        int visibilityFind(int startIndex, Vertice vertice);
 
         // Attributs
         vector<Vertice> verticeList;
