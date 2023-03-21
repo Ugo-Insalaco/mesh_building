@@ -47,6 +47,19 @@ int Face::getVerticePosition(int verticeIndex){
     }
     return verticePosition;
 }
+int Face::getFacePosition(int faceIndex){
+    int facePosition = -1;
+    if(faceIndexes[0] == faceIndex){
+        facePosition = 0;
+    }
+    if(faceIndexes[1] == faceIndex){
+        facePosition = 1;
+    }
+    if(faceIndexes[2] == faceIndex){
+        facePosition = 2;
+    }
+    return facePosition;
+}
 
 bool Face::isInfinite(){
     return verticeIndexes[0] == 0 || verticeIndexes[1] == 0 || verticeIndexes[2] == 0;

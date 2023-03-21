@@ -9,7 +9,7 @@
 
 using namespace std;
 
-Mesh::Mesh(string fileName, string extension){
+Mesh::Mesh(string fileName, string extension, bool delaunay){
     uniform_real_distribution<double> uniform(0.0, 1.0);
     this->uniform = uniform;
 
@@ -17,7 +17,7 @@ Mesh::Mesh(string fileName, string extension){
         importFromOFF(fileName);
     }
     if(extension == "txt"){
-        ImportFromTxt(fileName);
+        importFromTxt(fileName, delaunay);
     }
 };
 
@@ -123,7 +123,7 @@ void Mesh::exportToOFF(string shapeName, bool randomColors, bool plane){
     for(Face face : faceList){
         int * p = face.verticeIndexes;
         if(randomColors){
-            myfile << "3 " << *p << " " << *(p+1) << " " << *(p+2) << " "<<"3" <<" "<< this->uniform(this->engine) << " " << this->uniform(this->engine) << " " << this->uniform(this->engine) <<"\n";
+            myfile << "3 " << *p << " " << *(p+1) << " " << *(p+2) << " "<< (int)(this->uniform(this->engine)*255) << " " << (int)(this->uniform(this->engine)*255) << " " << (int)(this->uniform(this->engine)*255) <<"\n";
         }
         else{
             myfile << "3 " << *p << " " << *(p+1) << " " << *(p+2) << "\n";
@@ -165,7 +165,7 @@ void Mesh::exportToOFF(string shapeName, vector<float> values){
         int * p = face.verticeIndexes;
         float value = values.at((*p));
 
-        myfile << "3 " << *p << " " << *(p+1) << " " << *(p+2) << " "<<"3" <<" "<< (value) << " " << 1-value << " " << 0 <<"\n";
+        myfile << "3 " << *p << " " << *(p+1) << " " << *(p+2) << " "<< (value) << " " << 1-value << " " << 0 <<"\n";
     }
     myfile.close();
 };
@@ -289,7 +289,7 @@ void Mesh::triangleSplit(int faceIndex, int verticeIndex){
     int faceIndex2 = faceList.size() + 1;
 
     // On modifie les indices des faces associées à chaque sommet puis on ajoute la nouvelle face
-    vertice.faceIndex = faceIndex;
+    verticeList[verticeIndex].faceIndex = faceIndex;
     verticeList[face.verticeIndexes[0]].faceIndex = faceIndex1;
     verticeList[face.verticeIndexes[1]].faceIndex = faceIndex2;
     verticeList[face.verticeIndexes[2]].faceIndex = faceIndex;
@@ -327,7 +327,6 @@ void Mesh::outsideSplit(int faceIndex, int verticeIndex){
     bool createfp1 = faceList.at(face.faceIndexes[1]).getVerticePosition(verticeIndex) < 0;
     bool createfp2 = faceList.at(face.faceIndexes[2]).getVerticePosition(verticeIndex) < 0;
     
-    // cout << "flip ? " << endl;
     int faceIndex1, faceIndex2;
     if(!createfp0){
         edgeFlip(faceIndex, face.faceIndexes[0]);
@@ -342,7 +341,6 @@ void Mesh::outsideSplit(int faceIndex, int verticeIndex){
         cout << "problem" << endl;
     }
     if(createfp0 && createfp1 && createfp2){
-        // cout << "no flip" << endl;
         // On créé les nouvelles faces
         Face newFace0(face.verticeIndexes[1], face.verticeIndexes[2], verticeIndex);
         Face newFace1(face.verticeIndexes[2], face.verticeIndexes[0], verticeIndex);
@@ -353,7 +351,7 @@ void Mesh::outsideSplit(int faceIndex, int verticeIndex){
         int faceIndex2 = faceList.size() + 1;
 
         // On modifie les indices des faces associées à chaque sommet puis on ajoute la nouvelle face
-        vertice.faceIndex = faceIndex;
+        verticeList[verticeIndex].faceIndex = faceIndex;
         verticeList[face.verticeIndexes[0]].faceIndex = faceIndex1;
         verticeList[face.verticeIndexes[1]].faceIndex = faceIndex2;
         verticeList[face.verticeIndexes[2]].faceIndex = faceIndex;
@@ -509,7 +507,41 @@ int Mesh::visibilityFind(int startIndex, Vertice vertice, bool verbose = false){
 
 }
 
-void Mesh::ImportFromTxt(string fileName){
+void Mesh::propagateSplit(int verticeIndex){
+    vector<int> facesToTest;
+    getNeighboursList(verticeIndex, facesToTest);
+    int i = 0;
+    while(!facesToTest.empty() && i < 1000){
+        int faceIndex = facesToTest.back();
+        Face face = faceList.at(faceIndex);
+        if(face.isInfinite()){
+            facesToTest.pop_back();
+            continue;
+        }
+        int verticePosition = face.getVerticePosition(verticeIndex);
+        int oppositeFaceIndex = face.faceIndexes[verticePosition];
+        Face oppositeFace = faceList.at(oppositeFaceIndex);
+        int oppositeFacePosition = oppositeFace.getFacePosition(faceIndex);
+        if(oppositeFace.isInfinite()){
+            facesToTest.pop_back();
+            continue;
+        }
+        Vertice v1 = verticeList.at(oppositeFace.verticeIndexes[oppositeFacePosition]);
+        Vertice v2 = verticeList.at(face.verticeIndexes[(verticePosition)]);
+        Vertice v3 = verticeList.at(face.verticeIndexes[(verticePosition+1)%3]);
+        Vertice v4 = verticeList.at(face.verticeIndexes[(verticePosition+2)%3]);
+        if(isInCircle(v1, v2, v3, v4) >= 0){
+            edgeFlip(faceIndex, oppositeFaceIndex);
+            facesToTest.push_back(oppositeFaceIndex);
+        }
+        else{
+            facesToTest.pop_back();
+        }
+        i++;
+
+    }
+}
+void Mesh::importFromTxt(string fileName, bool delaunay){
     ifstream myfile;
     int verticeListSize;
     myfile.open("txt/"+fileName+".txt");
@@ -566,6 +598,9 @@ void Mesh::ImportFromTxt(string fileName){
         // Si on trouve une face dans le maillage on la split
         if(!faceList[faceIndex].isInfinite()){
             triangleSplit(faceIndex, verticeIndex);
+            if(delaunay){
+                propagateSplit(verticeIndex);
+            }
         }
         // Sinon on tourne autours du sommet infini et on split toutes les faces que l'on voit
         else{
@@ -611,8 +646,10 @@ void Mesh::ImportFromTxt(string fileName){
                 Vertice v2 = verticeList[nextFace.verticeIndexes[(verticePosition+2)%3]];
                 double pred = orientationTest(v1, v2, vertice);
                 if(pred < 0){
-                    cout << "spliting face "<< nextFaceIndex << endl;
                     outsideSplit(nextFaceIndex, verticeIndex);
+                    if(delaunay){
+                        propagateSplit(verticeIndex);
+                    }       
                 }
             };
         }

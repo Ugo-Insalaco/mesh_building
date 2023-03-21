@@ -8,11 +8,12 @@ using namespace std;
 class Mesh{
     public: 
         // Constructors
-        Mesh(string fileName, string extension);
+        Mesh(string fileName, string extension, bool delaunay = true);
         Mesh(vector<Vertice> verticeList, vector<Face> faceList): verticeList(verticeList), faceList(faceList){};
         
         // Import export
         void importFromOFF(string fileName);
+        void importFromTxt(string fileName, bool delaunay = true);
         void exportToOFF(string shapeName, bool randomColors = false, bool plane = false);
         void exportToOFF(string shapeName, vector<float> values);
 
@@ -29,8 +30,8 @@ class Mesh{
         void triangleSplit(int faceIndex, int verticeIndex);
         void outsideSplit(int faceIndex, int verticeIndex);
         void edgeFlip(int faceIndex1, int faceIndex2);
+        void propagateSplit(int verticeIndex);
         int visibilityFind(int startIndex, Vertice vertice, bool verbose);
-        void ImportFromTxt(string fileName);
 
         // Attributs
         vector<Vertice> verticeList;

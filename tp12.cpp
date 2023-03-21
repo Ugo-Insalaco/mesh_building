@@ -10,7 +10,7 @@
 using namespace std;
 
 int main(){
-    Mesh queen("queen");
+    Mesh queen("queen", "off");
     queen.printNeighbours(0);
     vector<float> laplacians = computeLaplacianMesh(queen);
     queen.exportToOFF("queen_with_laplacian", laplacians);

@@ -24,6 +24,7 @@ vector<float> computeLaplacianMesh(Mesh mesh){
     vector<Vertice> verticeList = mesh.verticeList;
     int verticeListSize = verticeList.size();
     for(int i = 0; i< verticeListSize; i++){
+        cout << i << "/" << verticeListSize << endl;
         Vertice laplacian = mesh.computeLaplacian(i);
         laplacianList.push_back(laplacian.normalize());
     }

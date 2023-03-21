@@ -10,6 +10,7 @@ class Face{
         void connectFace(int verticeIndex, int faceIndex);
         void updateFaceIndex(int oldFaceIndex, int newFaceIndex);
         int getVerticePosition(int verticeIndex);
+        int getFacePosition(int faceIndex);
         bool isInfinite();
         int verticeIndexes[3];
         int faceIndexes[3];
